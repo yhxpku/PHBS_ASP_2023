@@ -37,7 +37,10 @@ def basket_price_mc_cv(
         strike, spot, spot*vol, weights, texp, cor_m,
         intr, divr, cp, False, n_samples)
     '''
-    price2 = 0
+    np.random.set_state(rand_st)
+    price2 = basket_price_mc(
+        strike, spot, vol, weights, texp, cor_m,
+        intr, divr, cp, False, n_samples)
 
     ''' 
     compute price3: analytic price based on normal model
@@ -45,7 +48,8 @@ def basket_price_mc_cv(
     price3 = basket_price_norm_analytic(
         strike, spot, vol, weights, texp, cor_m, intr, divr, cp)
     '''
-    price3 = 0
+    price3 = basket_price_norm_analytic(
+        strike, spot, vol, weights, texp, cor_m, intr, divr, cp)
     
     # return two prices: without and with CV
     return np.array([price1, price1 - (price2 - price3)])
@@ -66,12 +70,21 @@ def basket_price_mc(
 
     n_assets = spot.size
     znorm_m = np.random.normal(size=(n_assets, n_samples))
-    
+
+    cov_bsm = vol / spot * cor_m * vol[:,None] / spot[:,None]
+    chol_bsm = np.linalg.cholesky(cov_bsm)  # L matrix in slides
+
+    cov_same = np.zeros_like(znorm_m)
+    for i in range(n_assets):
+        cov_same[i] = np.ones(n_samples) * cov_bsm[i,i]
+        
     if( bsm ) :
         '''
         PUT the simulation of the geometric brownian motion below
         '''
-        prices = np.zeros_like(znorm_m)
+        #bsm = True: BSM model
+        prices = forward[:,None] * np.exp(-0.5 * texp * cov_same + np.sqrt(texp) * chol_bsm @ znorm_m)
+        
     else:
         # bsm = False: normal model
         prices = forward[:,None] + np.sqrt(texp) * chol_m @ znorm_m
@@ -99,7 +112,19 @@ def basket_price_norm_analytic(
     
     PUT YOUR CODE BELOW
     '''
+    #basket_check_args(spot, vol, cor_m, weights)
+    div_fac = np.exp(-texp*divr)
+    disc_fac = np.exp(-texp*intr)
     
+    #1. compute the forward of the basket
+    forward = spot / disc_fac * div_fac
+
+    #2. compute the normal volatility of basket
+    #already defined and used as normal volatility
+    sigma = np.sqrt((weights*vol) @ cor_m @ np.transpose((weights*vol)))
     
-    
-    return 0.0
+    #3. plug in the forward and volatility to the normal price formula
+    norm = pf.Norm(sigma, intr=intr, divr=divr)
+    normprice = norm.price(strike, spot, texp, cp=cp)
+
+    return normprice
