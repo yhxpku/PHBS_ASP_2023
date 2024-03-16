@@ -127,4 +127,4 @@ def basket_price_norm_analytic(
     norm = pf.Norm(sigma, intr=intr, divr=divr)
     normprice = norm.price(strike, spot, texp, cp=cp)
 
-    return normprice
+    return normprice[0]
